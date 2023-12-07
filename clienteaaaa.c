@@ -160,7 +160,7 @@ int main(int argc, char *argv[]){
 
         pthread_t hebra;
         pthread_create(&hebra, NULL, Servidor, (void *)&sockCliente[i]);       
-   }
+    }
 
     return 0;
 }

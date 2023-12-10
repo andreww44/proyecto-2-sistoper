@@ -27,6 +27,47 @@ void createSocket(int *sock){
     }
 }
 
+// mensaje cuando ingresa/sale del chat 
+
+int timeoutFlag = 1;
+int timeoutCount = 0;
+pthread_mutex_t mutex;
+
+int T1 = 0;
+int T2 = 0;
+void *timeoutClock(void *args) {
+    int espera_T1 = 0; // Tiempo esperado para recibir conexiones
+    int espera_T2 = 0; // Tiempo esperado después de T1 sin conexiones
+    while (timeoutCount < 4 && numClients == 0) {
+        printf("Esperando conexiones...\n");
+        espera_T1 = 0;
+        espera_T2 = 0;
+        while (espera_T1 < T1 && numClients == 0) {
+            espera_T1++;
+            sleep(1); // Espera 1 segundo
+        }
+        pthread_mutex_lock(&mutex);
+        if (numClients == 0 && espera_T1 >= T1) {
+            espera_T2 = 0;
+            printf("No se han recibido conexiones en el tiempo T1. Siesta...\n");
+
+            close(serverSocket);
+
+            while (espera_T2 < T2) {
+                espera_T2++;
+                sleep(1); // Espera 1 segundo
+            }
+
+            timeoutCount++;
+            printf("Despertando después de la siesta. Siestas realizadas: %d\n", timeoutCount);
+
+            createSocket(&serverSocket);
+        }
+        pthread_mutex_unlock(&mutex);
+    }
+    pthread_exit(NULL);
+}
+
 void configServer(int socket, struct sockaddr_in *conf){
     conf->sin_family = AF_INET;		   		    // Dominio
     conf->sin_addr.s_addr = htonl(INADDR_ANY);	// Enlazar con cualquier dirección local
@@ -90,18 +131,22 @@ void *handleClient(void *arg) {
 
 
 void *waitAndSleep(void *arg) {
-    int T1 = *(int *)arg;
 
-    
     while (1) 
     {
-
         printf("Esperando nuevas conexiones...\n");
+
+        pthread_t timeout_thread;
+        pthread_mutex_init(&mutex, NULL);
+        pthread_create(&timeout_thread, NULL, timeoutClock, NULL);
 
         struct sockaddr_in clientAddr;
         socklen_t clientLen = sizeof(clientAddr);
-
+        
         int clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientLen);
+
+        pthread_join(timeout_thread, NULL);
+        pthread_mutex_destroy(&mutex);
 
         if (clientSocket == -1) {
             printf("Error al aceptar la conexión del cliente");
@@ -140,6 +185,8 @@ void *waitAndSleep(void *arg) {
 
         printf("Nuevo cliente conectado: %s:%d\n",
                inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
+        
+        
     }
 
     return NULL;
@@ -152,8 +199,8 @@ int main(int argc, char *argv[]) {
     }
 
     PORT = atoi(argv[1]);
-    int T1 = atoi(argv[2]);
-    int T2 = atoi(argv[3]);
+    T1 = atoi(argv[2]);
+    T2 = atoi(argv[3]);
 
     struct sockaddr_in serverAddr;
 
@@ -170,7 +217,7 @@ int main(int argc, char *argv[]) {
 
     // Crear hilo para esperar y dormir
     pthread_t waitAndSleepThread;
-    pthread_create(&waitAndSleepThread, NULL, waitAndSleep, (void *)&T1);
+    pthread_create(&waitAndSleepThread, NULL, waitAndSleep, NULL);
 
     // Esperar a que el hilo de espera y dormir termine
     pthread_join(waitAndSleepThread, NULL);

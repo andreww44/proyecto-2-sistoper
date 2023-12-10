@@ -5,10 +5,9 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-#define SERVER_IP "127.0.0.1"
-#define PORT 8000
 #define BUFFERSIZE 1024
 
+int flag = 0;
 int createSocket()
 {
     int clientSocket;
@@ -21,13 +20,15 @@ int createSocket()
     return clientSocket;
 }
 
-int connectToServer(int clientSocket)
+int connectToServer(int clientSocket, char *SERVER_IP, short PORT)
 {
     struct sockaddr_in server_addr;
 
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
     server_addr.sin_port = htons(PORT);
+    
+    printf("%d ---- %d ---- %s", clientSocket, PORT, SERVER_IP);
 
     if (connect(clientSocket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) 
     {
@@ -41,7 +42,7 @@ void *receiveMessages(void *arg) {
     int clientSocket = *(int *)arg;
     char buffer[BUFFERSIZE];
 
-    while (1) {
+    while (!flag) {
         int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
         if (bytesRead <= 0) {
             printf("El servidor ha cerrado la conexión.\n");
@@ -59,30 +60,30 @@ void *receiveMessages(void *arg) {
 int main(int argc, char *argv[]) {
 
     int clientSocket;
-    //struct sockaddr_in serverAddr;
 
     char nombreClientes[10];
-    strcpy(nombreClientes, argv[1]);
+    char *IP = argv[1];
+    char PORT[4];
 
-    //Configurar cliente
+    strcpy(PORT, argv[2]);
+    strcpy(nombreClientes, argv[3]);
+
+    short _port = (short)atoi(PORT);
+
     clientSocket = createSocket();
 
-    connectToServer(clientSocket);    
-
-    //send(clientSocket, nombreClientes, strlen(nombreClientes), 0);
+    connectToServer(clientSocket, IP, _port);    
 
     printf("Conectado al servidor de chat. Ingresa 'BYE' para salir.\n");
 
-    // Crear hilo para recibir mensajes
     pthread_t receiveThread;
     if (pthread_create(&receiveThread, NULL, receiveMessages, (void *)&clientSocket) != 0) {
-        perror("Error al crear el hilo de recepción de mensajes");
+        printf("Error al crear el hilo de recepción de mensajes");
         close(clientSocket);
         exit(1);
     }
 
-    // Enviar mensajes al servidor
-    char message[BUFFERSIZE];
+    char message[BUFFERSIZE] = {0};
     char messageCom[BUFFERSIZE] = {0};
     
     
@@ -90,9 +91,11 @@ int main(int argc, char *argv[]) {
     {
         
         fgets(message, sizeof(message), stdin);
+        printf("\033[1A");
+        printf("\033[K");
 
         strcat(messageCom, nombreClientes);
-        strcat(messageCom, " Dijo ->");
+        strcat(messageCom, " Dijo -> ");
         strcat(messageCom, message);
 
         if (strcmp(message, "BYE\n") == 0) {
@@ -107,11 +110,11 @@ int main(int argc, char *argv[]) {
         
         
     }
+    
+    flag = 1;
 
-    // Esperar a que el hilo de recepción termine
     pthread_join(receiveThread, NULL);
 
-    // Cerrar el socket del cliente
     close(clientSocket);
 
     return 0;

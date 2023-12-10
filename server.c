@@ -5,8 +5,9 @@
 #include <pthread.h>
 #include <arpa/inet.h>
 
-#define PORT 8000
 #define MAX_CLIENTS 10
+
+int PORT;
 
 // Estructura para almacenar la información de cada cliente
 typedef struct {
@@ -21,7 +22,7 @@ int serverSocket;
 
 void createSocket(int *sock){
     if ((*sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("Error al crear el socket");
+        printf("Error al crear el socket");
         exit(0);
     }
 }
@@ -39,7 +40,7 @@ void configServer(int socket, struct sockaddr_in *conf){
 
 void listenClients(int serverSocket){
     if (listen(serverSocket, MAX_CLIENTS) < 0) {
-        perror("Error al escuchar conexiones");
+        printf("Error al escuchar conexiones");
         close(serverSocket);
         exit(0);
     }
@@ -103,7 +104,7 @@ void *waitAndSleep(void *arg) {
         int clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientLen);
 
         if (clientSocket == -1) {
-            perror("Error al aceptar la conexión del cliente");
+            printf("Error al aceptar la conexión del cliente");
             continue;
         }
 
@@ -128,7 +129,7 @@ void *waitAndSleep(void *arg) {
         // Crear hilo para manejar al cliente
         pthread_t clientThread;
         if (pthread_create(&clientThread, NULL, handleClient, (void *)clientInfo) != 0) {
-            perror("Error al crear el hilo del cliente");
+            printf("Error al crear el hilo del cliente");
             close(clientSocket);
             free(clientInfo);
             continue;
@@ -150,10 +151,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int T1 = atoi(argv[1]);
-    int T2 = atoi(argv[2]);
+    PORT = atoi(argv[1]);
+    int T1 = atoi(argv[2]);
+    int T2 = atoi(argv[3]);
 
-    //int serverSocket;
     struct sockaddr_in serverAddr;
 
     // Configurar el socket del servidor
@@ -169,11 +170,7 @@ int main(int argc, char *argv[]) {
 
     // Crear hilo para esperar y dormir
     pthread_t waitAndSleepThread;
-    if (pthread_create(&waitAndSleepThread, NULL, waitAndSleep, (void *)&T1) != 0) {
-        perror("Error al crear el hilo de espera y dormir");
-        close(serverSocket);
-        exit(1);
-    }
+    pthread_create(&waitAndSleepThread, NULL, waitAndSleep, (void *)&T1);
 
     // Esperar a que el hilo de espera y dormir termine
     pthread_join(waitAndSleepThread, NULL);

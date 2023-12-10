@@ -56,7 +56,9 @@ void *handleClient(void *arg) {
     // Ejemplo: un bucle de lectura que retransmite mensajes a todos los clientes
     char buffer[1024];
     while (1) {
+        
         int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+        
         if (bytesRead <= 0) {
             // El cliente ha cerrado la conexión
             pthread_mutex_lock(&mutex);
@@ -78,6 +80,7 @@ void *handleClient(void *arg) {
         }
 
         // Retransmitir el mensaje a todos los clientes
+        
         pthread_mutex_lock(&mutex);
         for (int i = 0; i < numClients; i++) {
             send(clients[i].socket, buffer, bytesRead, 0);
@@ -118,7 +121,8 @@ void *waitAndSleep(void *arg) {
         if (numClients < MAX_CLIENTS) {
             clients[numClients] = *clientInfo;
             numClients++;
-        } else {
+        }
+        else {
             printf("Número máximo de clientes alcanzado. Rechazando nueva conexión.\n");
             close(clientSocket);
             free(clientInfo);
@@ -137,9 +141,8 @@ void *waitAndSleep(void *arg) {
 
         // Liberar el hilo hijo
         pthread_detach(clientThread);
-
-        printf("Nuevo cliente conectado: %s:%d\n",
-               inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
+        printf("Nuevo cliente conectado: %s:%d\n", inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
+    
     }
 
     return NULL;

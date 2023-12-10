@@ -9,6 +9,34 @@
 #define PORT 8000
 #define BUFFERSIZE 1024
 
+int createSocket()
+{
+    int clientSocket;
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket == -1) 
+    {
+        printf("Error al crear el socket");
+        exit(0);
+    }
+    return clientSocket;
+}
+
+int connectToServer(int clientSocket)
+{
+    struct sockaddr_in server_addr;
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
+    server_addr.sin_port = htons(PORT);
+
+    if (connect(clientSocket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) 
+    {
+        printf("Error al conectar al servidor");
+        close(clientSocket);
+        exit(0);
+    }
+}
+
 void *receiveMessages(void *arg) {
     int clientSocket = *(int *)arg;
     char buffer[BUFFERSIZE];
@@ -29,30 +57,17 @@ void *receiveMessages(void *arg) {
 }
 
 int main(int argc, char *argv[]) {
+
     int clientSocket;
-    struct sockaddr_in serverAddr;
+    //struct sockaddr_in serverAddr;
 
     char nombreClientes[10];
     strcpy(nombreClientes, argv[1]);
 
-    // Configurar el socket del cliente
-    if ((clientSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("Error al crear el socket del cliente");
-        exit(1);
-    }
+    //Configurar cliente
+    clientSocket = createSocket();
 
-    // Configurar la dirección del servidor
-    memset(&serverAddr, 0, sizeof(serverAddr));
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = inet_addr(SERVER_IP);
-    serverAddr.sin_port = htons(PORT);
-
-    // Conectar al servidor
-    if (connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) == -1) {
-        perror("Error al conectar al servidor");
-        close(clientSocket);
-        exit(1);
-    }
+    connectToServer(clientSocket);    
 
     //send(clientSocket, nombreClientes, strlen(nombreClientes), 0);
 

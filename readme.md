@@ -13,8 +13,8 @@ Integrantes: Álvaro Monsalve y Francisco Galeno
 - Terminar la conexión con los clientes que escriban "Adiós"
 
 ## Cliente
-- Aceptar comandos de ejecución
-- Crear sockets / Conectarse al server
+- Aceptar comandos de ejecución *Listo
+- Crear sockets / Conectarse al server 
 - Ciclo para pedir mensajes
 - Recibir mensajes desde el servidor
 - Agregar comando de "Adiós"

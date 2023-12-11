@@ -111,7 +111,9 @@ void *handleClient(void *arg) {
     // Ejemplo: un bucle de lectura que retransmite mensajes a todos los clientes
     char buffer[1024];
     while (1) {
+        
         int bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+        
         if (bytesRead <= 0) {
             // El cliente ha cerrado la conexión
             pthread_mutex_lock(&mutex);
@@ -133,6 +135,7 @@ void *handleClient(void *arg) {
         }
 
         // Retransmitir el mensaje a todos los clientes
+        
         pthread_mutex_lock(&mutex);
         for (int i = 0; i < numClients; i++) {
             send(clients[i].socket, buffer, bytesRead, 0);

@@ -4,6 +4,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <arpa/inet.h>
+#include <sys/select.h>
 
 #define MAX_CLIENTS 10
 
@@ -19,6 +20,8 @@ ClientInfo clients[MAX_CLIENTS];
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int numClients = 0;
 int serverSocket;
+
+struct sockaddr_in serverAddr;
 
 void createSocket(int *sock){
     if ((*sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -87,6 +90,17 @@ void listenClients(int serverSocket){
     }
 }
 
+void createServer() {
+    // Configurar el socket del servidor
+    createSocket(&serverSocket);
+    
+    // Configurar la dirección del servidor
+    configServer(serverSocket, &serverAddr);
+
+    // Escuchar conexiones entrantes
+    listenClients(serverSocket);
+}
+
 void *handleClient(void *arg) {
     ClientInfo *clientInfo = (ClientInfo *)arg;
     int clientSocket = clientInfo->socket;
@@ -132,63 +146,87 @@ void *handleClient(void *arg) {
 
 void *waitAndSleep(void *arg) {
 
+    fd_set readfds;
+    struct timeval timeout;
+    int clientSocket;
+
     while (1) 
     {
         printf("Esperando nuevas conexiones...\n");
 
-        pthread_t timeout_thread;
-        pthread_mutex_init(&mutex, NULL);
-        pthread_create(&timeout_thread, NULL, timeoutClock, NULL);
-
         struct sockaddr_in clientAddr;
         socklen_t clientLen = sizeof(clientAddr);
         
-        int clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientLen);
+        FD_ZERO(&readfds);
+        FD_SET(serverSocket, &readfds);
 
-        pthread_join(timeout_thread, NULL);
-        pthread_mutex_destroy(&mutex);
+        timeout.tv_sec = T1;
+        timeout.tv_usec = 0;
 
-        if (clientSocket == -1) {
-            printf("Error al aceptar la conexión del cliente");
-            continue;
+        int ready = select(serverSocket + 1, &readfds, NULL, NULL, &timeout);
+
+        if(ready == 0 && numClients == 0)
+        {
+            printf("No se han encontrado clientes, suspendiendo el servidor...\n");
+            timeoutCount += 1;
+            if(timeoutCount > 3)
+            {
+                printf("Cerrando el servidor.");
+                return NULL;
+            }
+            close(serverSocket);
+            sleep(T2);
+            createServer();
         }
+        else 
+        {
+            if(FD_ISSET(serverSocket, &readfds)) 
+            {
+                timeoutCount = 0;
+                clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientLen);
 
-        // Configurar información del cliente
-        ClientInfo *clientInfo = (ClientInfo *)malloc(sizeof(ClientInfo));
-        clientInfo->socket = clientSocket;
-        clientInfo->address = clientAddr;
+                if (clientSocket == -1) 
+                {
+                    printf("Error al aceptar la conexión del cliente");
+                    continue;
+                }
 
-        // Agregar cliente al array
-        pthread_mutex_lock(&mutex);
-        if (numClients < MAX_CLIENTS) {
-            clients[numClients] = *clientInfo;
-            numClients++;
-        } else {
-            printf("Número máximo de clientes alcanzado. Rechazando nueva conexión.\n");
-            close(clientSocket);
-            free(clientInfo);
-            continue;
+                // Configurar información del cliente
+                ClientInfo *clientInfo = (ClientInfo *)malloc(sizeof(ClientInfo));
+                clientInfo->socket = clientSocket;
+                clientInfo->address = clientAddr;
+
+                // Agregar cliente al array
+                pthread_mutex_lock(&mutex);
+                if (numClients < MAX_CLIENTS) {
+                    clients[numClients] = *clientInfo;
+                    numClients++;
+                } else {
+                    printf("Número máximo de clientes alcanzado. Rechazando nueva conexión.\n");
+                    close(clientSocket);
+                    free(clientInfo);
+                    continue;
+                }
+                pthread_mutex_unlock(&mutex);
+
+                // Crear hilo para manejar al cliente
+                pthread_t clientThread;
+                if (pthread_create(&clientThread, NULL, handleClient, (void *)clientInfo) != 0) {
+                    printf("Error al crear el hilo del cliente");
+                    close(clientSocket);
+                    free(clientInfo);
+                    continue;
+                }
+
+                // Liberar el hilo hijo
+                pthread_detach(clientThread);
+
+                printf("Nuevo cliente conectado: %s:%d\n",
+                inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
+                
+            }
         }
-        pthread_mutex_unlock(&mutex);
-
-        // Crear hilo para manejar al cliente
-        pthread_t clientThread;
-        if (pthread_create(&clientThread, NULL, handleClient, (void *)clientInfo) != 0) {
-            printf("Error al crear el hilo del cliente");
-            close(clientSocket);
-            free(clientInfo);
-            continue;
-        }
-
-        // Liberar el hilo hijo
-        pthread_detach(clientThread);
-
-        printf("Nuevo cliente conectado: %s:%d\n",
-               inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
-        
-        
     }
-
     return NULL;
 }
 
@@ -202,16 +240,7 @@ int main(int argc, char *argv[]) {
     T1 = atoi(argv[2]);
     T2 = atoi(argv[3]);
 
-    struct sockaddr_in serverAddr;
-
-    // Configurar el socket del servidor
-    createSocket(&serverSocket);
-    
-    // Configurar la dirección del servidor
-    configServer(serverSocket, &serverAddr);
-
-    // Escuchar conexiones entrantes
-    listenClients(serverSocket);
+    createServer();
 
     printf("Servidor de chat en espera de conexiones...\n");
 

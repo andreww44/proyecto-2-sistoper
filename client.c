@@ -83,6 +83,11 @@ void *receiveMessages(void *arg) {
 
 int main(int argc, char *argv[]) {
 
+    if(argc < 3){
+        printf("Por favor ingrese los argumentos\n");
+        return 0;
+    }
+
     //Descriptor del socket
     int clientSocket;
 

@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
     int clientSocket;
 
     //String que guarda el nombre del cliente
-    char nombreClientes[10];
+    char nombreClientes[BUFFER_S];
     //Direccion que guarda la IP
     char *IP = argv[1];
     //String que guarda el puerto
